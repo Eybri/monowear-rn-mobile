@@ -8,23 +8,29 @@ import baseURL from "../../assets/common/baseurl";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 
+// Enhanced color palette with more depth
 const Colors = {
-  primary: '#8e44ad',
-  secondary: '#9b59b6', 
-  success: '#2ecc71',
-  danger: '#e74c3c',
-  warning: '#f39c12',
-  info: '#3498db',
-  light: '#f8f9fa',
-  dark: '#343a40',
-  white: '#ffffff',
-  muted: '#6c757d',
-  backgroundLight: '#f5f5f5',
-  border: '#e1e1e1',
-  textDark: '#2c3e50',
-  textMuted: '#6c757d',
-  textLight: '#95a5a6',
-  shadow: 'rgba(0,0,0,0.1)',
+  primary: '#1E7F4C',       // Deeper dark pastel green
+  primaryLight: '#2CAB6F',  // Medium pastel green
+  primaryLighter: '#A8EBCF', // Light pastel green with more saturation
+  secondary: '#446141',     // Deep forest green
+  accent: '#83C48A',        // Muted pastel green
+  success: '#4CAF50',
+  danger: '#E53935',
+  warning: '#FFAB00',
+  info: '#0288D1',
+  light: '#F8FAF7',         // Very light green tint
+  dark: '#1F2D20',          // Very dark green
+  white: '#FFFFFF',
+  muted: '#9E9E9E',
+  backgroundLight: '#F5FFF8', // Light green tinted background
+  border: '#DAEBD7',        // Light green border
+  textDark: '#1A2A1B',      // Very dark green text
+  textMuted: '#6B7D6C',     // Muted green text
+  textLight: '#B5C9B7',     // Light green text
+  shadow: 'rgba(30,127,76,0.15)', // Green tinted shadow
+  cardBackground: '#FFFFFF',
+  statusBadgeShadow: 'rgba(0,0,0,0.1)',
 };
 
 const UserOrderHistory = () => {
@@ -67,29 +73,51 @@ const UserOrderHistory = () => {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem("jwt");
+      
+      if (!token) {
+        setIsAuthenticated(false);
+        setLoading(false);
+        return;
+      }
+  
       const response = await fetch(`${baseURL}/orders`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`
         },
       });
-
+  
+      if (response.status === 401) {
+        // JWT is invalid or expired
+        await AsyncStorage.removeItem("jwt");
+        setIsAuthenticated(false);
+        setLoading(false);
+        return;
+      }
+  
       if (!response.ok) {
         throw new Error("Failed to fetch orders");
       }
-
+  
       const data = await response.json();
       setOrders(data.orders);
       setError(null);
     } catch (err) {
       console.error('Error fetching orders:', err);
-      setError(err.message);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to load your orders',
-        position: 'bottom'
-      });
+      
+      if (err.message.includes('jwt') || err.message.includes('token')) {
+        // Handle JWT related errors
+        await AsyncStorage.removeItem("jwt");
+        setIsAuthenticated(false);
+      } else {
+        setError(err.message);
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to load your orders',
+          position: 'bottom'
+        });
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -99,30 +127,49 @@ const UserOrderHistory = () => {
   const fetchUserReviews = async () => {
     try {
       const token = await AsyncStorage.getItem("jwt");
+      
+      if (!token) {
+        return;
+      }
+  
       const response = await fetch(`${baseURL}/reviews/all`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`
         },
       });
-
+  
+      if (response.status === 401) {
+        // JWT is invalid or expired
+        await AsyncStorage.removeItem("jwt");
+        setIsAuthenticated(false);
+        return;
+      }
+  
       if (!response.ok) {
         throw new Error("Failed to fetch reviews");
       }
-
+  
       const data = await response.json();
       setUserReviews(data.reviews);
     } catch (err) {
       console.error('Error fetching reviews:', err);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to load your reviews',
-        position: 'bottom'
-      });
+      
+      if (err.message.includes('jwt') || err.message.includes('token')) {
+        // Handle JWT related errors
+        await AsyncStorage.removeItem("jwt");
+        setIsAuthenticated(false);
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to load your reviews',
+          position: 'bottom'
+        });
+      }
     }
   };
-
+  
   const handleRefresh = () => {
     setRefreshing(true);
     fetchUserOrders();
@@ -144,6 +191,13 @@ const UserOrderHistory = () => {
             onPress: async () => {
               setLoading(true);
               const token = await AsyncStorage.getItem("jwt");
+              
+              if (!token) {
+                setIsAuthenticated(false);
+                setLoading(false);
+                return;
+              }
+  
               const response = await fetch(`${baseURL}/orders/update`, {
                 method: "PUT",
                 headers: {
@@ -156,11 +210,19 @@ const UserOrderHistory = () => {
                   note: 'Cancelled by user'
                 })
               });
-
+  
+              if (response.status === 401) {
+                // JWT is invalid or expired
+                await AsyncStorage.removeItem("jwt");
+                setIsAuthenticated(false);
+                setLoading(false);
+                return;
+              }
+  
               if (!response.ok) {
                 throw new Error("Failed to cancel order");
               }
-
+  
               const updatedOrder = await response.json();
               setOrders(orders.map(order => 
                 order._id === orderId ? updatedOrder.order : order
@@ -179,17 +241,24 @@ const UserOrderHistory = () => {
       );
     } catch (err) {
       console.error('Error cancelling order:', err);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to cancel order',
-        position: 'bottom'
-      });
+      
+      if (err.message.includes('jwt') || err.message.includes('token')) {
+        // Handle JWT related errors
+        await AsyncStorage.removeItem("jwt");
+        setIsAuthenticated(false);
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to cancel order',
+          position: 'bottom'
+        });
+      }
     } finally {
       setLoading(false);
     }
   };
-
+  
   const toggleOrderDetails = (orderId) => {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
   };
@@ -199,84 +268,82 @@ const UserOrderHistory = () => {
       review.product._id === productId && review.order._id === orderId
     );
   };
-// Update the handleRatePress function to pass the correct product ID
-const handleRatePress = (product, orderId) => {
-  setSelectedProduct(product);
-  setSelectedOrderId(orderId);
-  setRating(0);
-  setComment('');
-  setModalVisible(true);
-};
 
-// Update the submitReview function to ensure productId is properly sent
-const submitReview = async () => {
-  if (rating === 0) {
-    Toast.show({
-      type: 'error',
-      text1: 'Error',
-      text2: 'Please select a rating',
-      position: 'bottom'
-    });
-    return;
-  }
+  const handleRatePress = (product, orderId) => {
+    setSelectedProduct(product);
+    setSelectedOrderId(orderId);
+    setRating(0);
+    setComment('');
+    setModalVisible(true);
+  };
 
-  try {
-    setReviewLoading(true);
-    const token = await AsyncStorage.getItem("jwt");
-    
-    // Create JSON data
-    const reviewData = {
-      rating: rating,
-      comment: comment,
-      productId: selectedProduct._id,
-      orderId: selectedOrderId
-    };
-    
-    console.log('Sending review data:', reviewData); // Debug log
-    
-    const response = await fetch(`${baseURL}/reviews`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(reviewData)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to submit review");
+  const submitReview = async () => {
+    if (rating === 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please select a rating',
+        position: 'bottom'
+      });
+      return;
     }
-
-    // Refresh user reviews
-    await fetchUserReviews();
-    
-    setModalVisible(false);
-    Toast.show({
-      type: 'success',
-      text1: 'Success',
-      text2: 'Review submitted successfully',
-      position: 'bottom'
-    });
-  } catch (err) {
-    console.error('Error submitting review:', err);
-    Toast.show({
-      type: 'error',
-      text1: 'Error',
-      text2: err.message || 'Failed to submit review',
-      position: 'bottom'
-    });
-  } finally {
-    setReviewLoading(false);
-  }
-};
-    const renderOrderStatus = (status) => {
+  
+    try {
+      setReviewLoading(true);
+      const token = await AsyncStorage.getItem("jwt");
+      
+      // Create JSON data instead of FormData
+      const reviewData = {
+        rating: rating,
+        comment: comment,
+        productId: selectedProduct._id,
+        orderId: selectedOrderId
+      };
+      
+      const response = await fetch(`${baseURL}/reviews`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json" // Set Content-Type to JSON
+        },
+        body: JSON.stringify(reviewData) // Send JSON string
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to submit review");
+      }
+  
+      // Refresh user reviews
+      await fetchUserReviews();
+      
+      setModalVisible(false);
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Review submitted successfully',
+        position: 'bottom'
+      });
+    } catch (err) {
+      console.error('Error submitting review:', err);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: err.message || 'Failed to submit review',
+        position: 'bottom'
+      });
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+  
+  const renderOrderStatus = (status) => {
     let statusConfig = {
       Pending: { color: Colors.warning, icon: 'clock-o', text: 'Processing' },
       Shipped: { color: Colors.info, icon: 'truck', text: 'Shipped' },
       Delivered: { color: Colors.success, icon: 'check-circle', text: 'Delivered' },
       Cancelled: { color: Colors.danger, icon: 'times-circle', text: 'Cancelled' },
-      Completed: { color: Colors.success, icon: 'check-circle', text: 'Completed' }
+      Completed: { color: Colors.primaryLight, icon: 'check-circle', text: 'Completed' }
     };
 
     const config = statusConfig[status] || { 
@@ -292,7 +359,7 @@ const submitReview = async () => {
       </View>
     );
   };
-
+  
   const renderOrderItem = ({ item }) => {
     const isExpanded = expandedOrderId === item._id;
     const orderDate = moment(item.createdAt).format('MMM D, YYYY [at] h:mm A');
@@ -317,6 +384,7 @@ const submitReview = async () => {
         <TouchableOpacity 
           onPress={() => toggleOrderDetails(item._id)} 
           style={styles.expandButton}
+          activeOpacity={0.8}
         >
           <Text style={styles.expandButtonText}>
             {isExpanded ? 'Hide Details' : 'View Details'}
@@ -332,49 +400,58 @@ const submitReview = async () => {
           <View style={styles.expandedContent}>
             <Text style={styles.sectionTitle}>Order Items</Text>
             {item.products.map((product, index) => (
-  <View key={index} style={styles.productItem}>
-    <View style={styles.productInfo}>
-      <Text style={styles.productName}>{product.productId?.name || 'Unknown Product'}</Text>
-      <View style={styles.productDetails}>
-        <View style={[styles.colorIndicator, { backgroundColor: product.color || '#ddd' }]} />
-        <Text style={styles.productQty}>{product.quantity}x</Text>
-        <Text style={styles.productPrice}>₱{product.price.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</Text>
-      </View>
-    </View>
-    
-    {canReview && (
-      <View style={styles.reviewContainer}>
-        {isReviewed(product.productId?._id, item._id) ? (
-          <View style={styles.reviewedBadge}>
-            <Text style={styles.reviewedText}>Reviewed</Text>
-          </View>
-        ) : (
-          <TouchableOpacity 
-            style={styles.rateButton}
-            onPress={() => handleRatePress(product.productId, item._id)}
-          >
-            <MaterialIcons name="rate-review" size={16} color="white" />
-            <Text style={styles.buttonText}>Rate</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    )}
-  </View>
-))}
+              <View key={index} style={styles.productItem}>
+                <View style={styles.productInfo}>
+                  <Text style={styles.productName}>{product.productId?.name || 'Unknown Product'}</Text>
+                  <View style={styles.productDetails}>
+                    <View style={[styles.colorIndicator, { backgroundColor: product.color || '#ddd' }]} />
+                    <Text style={styles.productQty}>{product.quantity}x</Text>
+                    <Text style={styles.productPrice}>₱{product.price.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</Text>
+                  </View>
+                </View>
+                
+                {canReview && (
+                  <View style={styles.reviewContainer}>
+                    {isReviewed(product.productId?._id, item._id) ? (
+                      <View style={styles.reviewedBadge}>
+                        <FontAwesome name="check" size={12} color={Colors.white} style={{marginRight: 4}} />
+                        <Text style={styles.reviewedText}>Reviewed</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        style={styles.rateButton}
+                        onPress={() => handleRatePress(product.productId, item._id)}
+                        activeOpacity={0.8}
+                      >
+                        <MaterialIcons name="rate-review" size={16} color="white" style={{marginRight: 6}} />
+                        <Text style={styles.buttonText}>Rate</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </View>
+            ))}
+
             <Text style={styles.sectionTitle}>Shipping Address</Text>
-            <Text style={styles.addressText}>
-              {item.shippingAddress?.address}, {item.shippingAddress?.city}, {item.shippingAddress?.postalCode}, {item.shippingAddress?.country}
-            </Text>
+            <View style={styles.infoBox}>
+              <Text style={styles.addressText}>
+                {item.shippingAddress?.address}, {item.shippingAddress?.city}, {item.shippingAddress?.postalCode}, {item.shippingAddress?.country}
+              </Text>
+            </View>
 
             <Text style={styles.sectionTitle}>Payment Method</Text>
-            <Text style={styles.paymentMethod}>
-              {item.paymentMethod === 'cashondelivery' ? 'Cash on Delivery' : 'Credit Card'}
-            </Text>
+            <View style={styles.infoBox}>
+              <Text style={styles.paymentMethod}>
+                {item.paymentMethod === 'cashondelivery' ? 'Cash on Delivery' : 'Credit Card'}
+              </Text>
+            </View>
 
             {item.status === 'Cancelled' && item.note && (
               <>
                 <Text style={[styles.sectionTitle, { color: Colors.danger }]}>Cancellation Note</Text>
-                <Text style={styles.cancellationNote}>{item.note}</Text>
+                <View style={[styles.infoBox, styles.cancellationBox]}>
+                  <Text style={styles.cancellationNote}>{item.note}</Text>
+                </View>
               </>
             )}
 
@@ -382,8 +459,9 @@ const submitReview = async () => {
               <TouchableOpacity 
                 style={styles.cancelButton}
                 onPress={() => handleCancelOrder(item._id)}
+                activeOpacity={0.8}
               >
-                <MaterialIcons name="cancel" size={18} color="white" />
+                <MaterialIcons name="cancel" size={18} color="white" style={{marginRight: 8}} />
                 <Text style={styles.buttonText}>Cancel Order</Text>
               </TouchableOpacity>
             )}
@@ -397,36 +475,47 @@ const submitReview = async () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>Loading your orders...</Text>
       </View>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <View style={styles.emptyContainer}>
-        <MaterialIcons name="shopping-bag" size={48} color={Colors.muted} />
-        <Text style={styles.emptyText}>No orders to show</Text>
-        <Text style={styles.emptySubtext}>Please login to view your orders</Text>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('Login')}
-        >
-          <Text style={styles.actionButtonText}>Login</Text>
-        </TouchableOpacity>
+      <View style={styles.authContainer}>
+        <View style={styles.authContent}>
+          <MaterialIcons name="lock" size={60} color={Colors.primary} style={styles.authIcon} />
+          <Text style={styles.authTitle}>Login Required</Text>
+          <Text style={styles.authSubtitle}>Please login to view your order history</Text>
+          <TouchableOpacity 
+            style={styles.loginButton}
+            onPress={() => navigation.navigate('Login')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.loginButtonText}>Login</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.signupButton}
+            onPress={() => navigation.navigate('Register')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.signupButtonText}>Create Account</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
-
+  
   if (orders.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <MaterialIcons name="shopping-bag" size={48} color={Colors.muted} />
+        <MaterialIcons name="shopping-bag" size={60} color={Colors.muted} />
         <Text style={styles.emptyText}>No orders yet</Text>
         <Text style={styles.emptySubtext}>Start shopping to see your orders here</Text>
         <TouchableOpacity 
           style={styles.actionButton}
           onPress={() => navigation.navigate('Products')}
+          activeOpacity={0.8}
         >
           <Text style={styles.actionButtonText}>Browse Products</Text>
         </TouchableOpacity>
@@ -437,9 +526,13 @@ const submitReview = async () => {
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <MaterialIcons name="error-outline" size={36} color={Colors.danger} />
+        <MaterialIcons name="error-outline" size={45} color={Colors.danger} />
         <Text style={styles.errorText}>Failed to load orders</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchUserOrders}>
+        <TouchableOpacity 
+          style={styles.retryButton} 
+          onPress={fetchUserOrders}
+          activeOpacity={0.8}
+        >
           <Text style={styles.retryButtonText}>Try Again</Text>
         </TouchableOpacity>
       </View>
@@ -448,7 +541,10 @@ const submitReview = async () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.pageTitle}>Your Order History</Text>
+      <View style={styles.headerContainer}>
+        <Text style={styles.pageTitle}>Your Order History</Text>
+        <Text style={styles.pageSubtitle}>{orders.length} {orders.length === 1 ? 'order' : 'orders'} found</Text>
+      </View>
       
       <FlatList
         data={orders}
@@ -460,6 +556,7 @@ const submitReview = async () => {
         initialNumToRender={5}
         maxToRenderPerBatch={5}
         windowSize={5}
+        showsVerticalScrollIndicator={false}
       />
 
       {/* Review Modal */}
@@ -474,6 +571,7 @@ const submitReview = async () => {
             <TouchableOpacity 
               style={styles.closeButton}
               onPress={() => setModalVisible(false)}
+              activeOpacity={0.8}
             >
               <AntDesign name="close" size={24} color={Colors.dark} />
             </TouchableOpacity>
@@ -488,14 +586,17 @@ const submitReview = async () => {
                 showRating
                 type="star"
                 startingValue={rating}
-                imageSize={30}
+                imageSize={32}
                 onFinishRating={setRating}
                 style={styles.rating}
+                tintColor={Colors.white}
+                ratingColor={Colors.warning}
+                ratingBackgroundColor={Colors.border}
               />
             </View>
             
             <Input
-              placeholder="Write your review here..."
+              placeholder="Share your experience with this product..."
               multiline
               numberOfLines={4}
               textAlignVertical="top"
@@ -504,12 +605,14 @@ const submitReview = async () => {
               containerStyle={styles.inputContainer}
               inputContainerStyle={styles.textInput}
               inputStyle={styles.reviewText}
+              placeholderTextColor={Colors.textMuted}
             />
             
             <TouchableOpacity 
               style={styles.submitButton}
               onPress={submitReview}
               disabled={reviewLoading}
+              activeOpacity={0.8}
             >
               {reviewLoading ? (
                 <ActivityIndicator size="small" color={Colors.white} />
@@ -525,336 +628,280 @@ const submitReview = async () => {
 };
 
 const styles = StyleSheet.create({
+  // Enhanced container styles with shadow and depth
   container: {
     flex: 1,
     backgroundColor: Colors.backgroundLight,
-    padding: 10,
+    padding: 16,
+  },
+  headerContainer: {
+    marginVertical: 16,
   },
   pageTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: Colors.primary,
-    textAlign: 'center',
-    marginVertical: 16,
-    letterSpacing: 1,
+    fontSize: 26,
+    fontWeight: '700',
+    color: Colors.dark,
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0,0,0,0.1)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  pageSubtitle: {
+    fontSize: 15,
+    color: Colors.textMuted,
+    marginTop: 4,
   },
   listContainer: {
     paddingBottom: 20,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: Colors.textDark,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: Colors.danger,
-    fontWeight: 'bold',
-  },
-  retryButton: {
-    marginTop: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: Colors.white,
-    fontWeight: 'bold',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 18,
-    color: Colors.textDark,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  actionButton: {
-    marginTop: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-    minWidth: 200,
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    color: Colors.white,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
   orderCard: {
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 18,
     borderWidth: 0,
+    backgroundColor: Colors.cardBackground,
     shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   orderId: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.textDark,
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.dark,
+    letterSpacing: 0.3,
   },
   orderDate: {
-    fontSize: 12,
+    fontSize: 13,
     color: Colors.textMuted,
-    marginTop: 4,
+    marginTop: 5,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    shadowColor: Colors.statusBadgeShadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   statusIcon: {
-    marginRight: 5,
+    marginRight: 6,
   },
   statusText: {
-    color: Colors.white,
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    color: Colors.white,
+    letterSpacing: 0.5,
   },
   orderSummary: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 10,
+    paddingVertical: 14,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
+    marginBottom: 12,
   },
   orderTotal: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 19,
+    fontWeight: '700',
     color: Colors.primary,
+    letterSpacing: 0.5,
   },
   itemCount: {
     fontSize: 14,
     color: Colors.textMuted,
+    fontWeight: '500',
   },
   expandButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.primaryLighter,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 1,
   },
   expandButtonText: {
     fontSize: 14,
     color: Colors.primary,
-    marginRight: 5,
+    fontWeight: '600',
+    marginRight: 8,
+    letterSpacing: 0.3,
   },
   expandedContent: {
-    marginTop: 15,
-    paddingTop: 15,
+    marginTop: 18,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.textDark,
+    fontWeight: '700',
+    color: Colors.dark,
+    marginTop: 14,
     marginBottom: 8,
+    letterSpacing: 0.3,
+  },
+  infoBox: {
+    backgroundColor: Colors.light,
+    padding: 14,
+    borderRadius: 10,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  cancellationBox: {
+    backgroundColor: 'rgba(244,67,54,0.05)',
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.danger,
   },
   productItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    marginVertical: 6,
+    backgroundColor: Colors.light,
+    borderRadius: 10,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
   },
   productInfo: {
     flex: 1,
+    marginRight: 10,
   },
   productName: {
-    fontSize: 14,
+    fontSize: 15,
     color: Colors.textDark,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   productDetails: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 8,
   },
   colorIndicator: {
     width: 16,
     height: 16,
     borderRadius: 8,
-    marginRight: 8,
+    marginRight: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   productQty: {
     fontSize: 14,
-    color: Colors.textDark,
+    fontWeight: '500',
+    color: Colors.textMuted,
     marginRight: 8,
   },
   productPrice: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.textDark,
-  },
-  addressText: {
-    fontSize: 14,
-    color: Colors.textDark,
-    marginBottom: 12,
-  },
-  paymentMethod: {
-    fontSize: 14,
-    color: Colors.textDark,
-    marginBottom: 12,
-  },
-  cancellationNote: {
-    fontSize: 14,
-    color: Colors.danger,
-    fontStyle: 'italic',
-    marginBottom: 12,
-    padding: 10,
-    backgroundColor: 'rgba(231,76,60,0.1)',
-    borderRadius: 8,
-  },
-  cancelButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: Colors.danger,
-    marginTop: 15,
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.primary,
   },
   reviewContainer: {
-    marginLeft: 10,
+    marginLeft: 4,
+  },
+  reviewedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  reviewedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.white,
   },
   rateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: Colors.info,
-  },
-  reviewedBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: Colors.success,
-  },
-  reviewedText: {
-    color: Colors.white,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  buttonText: {
-    color: Colors.white,
-    fontWeight: 'bold',
-    marginLeft: 5,
-    fontSize: 12,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    width: '90%',
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.primaryLight,
     shadowColor: Colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    zIndex: 1,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.textDark,
-    marginBottom: 5,
-    textAlign: 'center',
-  },
-  productTitle: {
-    fontSize: 16,
-    color: Colors.textDark,
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  ratingContainer: {
-    alignItems: 'center',
-    marginVertical: 10,
-  },
-  rating: {
-    paddingVertical: 10,
-  },
-  inputContainer: {
-    marginTop: 15,
-    paddingHorizontal: 0,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    minHeight: 100,
-  },
-  reviewText: {
-    textAlignVertical: 'top',
-  },
-  submitButton: {
-    marginTop: 20,
-    backgroundColor: Colors.primary,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  submitButtonText: {
+  buttonText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: Colors.white,
-    fontWeight: 'bold',
-    fontSize: 16,
+    letterSpacing: 0.3,
+  },
+  cancelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: Colors.danger,
+    marginTop: 18,
+    shadowColor: 'rgba(244,67,54,0.35)',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  addressText: {
+    fontSize: 14,
+    color: Colors.textDark,
+    lineHeight: 22,
+  },
+  paymentMethod: {
+    fontSize: 14,
+    color: Colors.textDark,
+    fontWeight: '500',
+  },
+  cancellationNote: {
+    fontSize: 14,
+    color: Colors.danger,
+    fontWeight: '500',
+    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+  
+  // Auth styles with more depth
+  authContainer: {
+    flex: 1,
+    backgroundColor: Colors.backgroundLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
 });
 

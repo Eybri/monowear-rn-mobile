@@ -20,6 +20,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import baseURL from '../../assets/common/baseurl'; // Your base URL
+import { useNavigation } from '@react-navigation/native'; // Import useNavigation
 
 const OrderReviews = () => {
   const [loading, setLoading] = useState(true);
@@ -31,15 +32,25 @@ const OrderReviews = () => {
     rating: 0,
     comment: '',
   });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const navigation = useNavigation(); // Initialize navigation
 
   const getToken = async () => {
-    return await AsyncStorage.getItem('jwt');
+    const token = await AsyncStorage.getItem('jwt');
+    setIsAuthenticated(!!token);
+    return token;
   };
 
   useEffect(() => {
     const fetchReviews = async () => {
       try {
         const token = await getToken();
+        
+        if (!token) {
+          setLoading(false);
+          return;
+        }
+
         const config = {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -219,6 +230,21 @@ const OrderReviews = () => {
     );
   }
 
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.authContainer}>
+        <Icon name="lock" size={50} color="#5e8c7f" />
+        <Text style={styles.authText}>Please login to view your reviews</Text>
+        <TouchableOpacity 
+          style={styles.loginButton}
+          onPress={() => navigation.navigate('Login')}
+        >
+          <Text style={styles.loginButtonText}>Login</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (error) {
     return (
       <View style={styles.errorContainer}>
@@ -327,6 +353,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#1a2e35',
+  },
+  authContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a2e35',
+    padding: 20,
+  },
+  authText: {
+    color: '#f0f7f4',
+    fontSize: 18,
+    marginVertical: 20,
+    textAlign: 'center',
+  },
+  loginButton: {
+    backgroundColor: '#5e8c7f',
+    padding: 15,
+    borderRadius: 8,
+    width: '60%',
+    alignItems: 'center',
+  },
+  loginButtonText: {
+    color: '#f0f7f4',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   errorContainer: {
     flex: 1,

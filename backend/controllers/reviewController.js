@@ -15,22 +15,6 @@ exports.addReview = async (req, res) => {
         if (!productId || !rating || !comment || !orderId) 
             return res.status(400).json({ message: 'All fields are required, including order ID.' });
 
-        // Find the order to verify the product exists in the order
-        const order = await Order.findById(orderId);
-        if (!order) {
-            return res.status(404).json({ message: 'Order not found.' });
-        }
-
-        // Check if product exists in the order
-        const productInOrder = order.products.some(product => 
-            product.productId.toString() === productId.toString()
-        );
-
-        if (!productInOrder) {
-            return res.status(400).json({ message: 'This product is not in the specified order.' });
-        }
-
-        // Check if review already exists for this specific product and order
         const existingReview = await Review.findOne({ 
             product: productId, 
             user: req.user._id, 
@@ -51,8 +35,7 @@ exports.addReview = async (req, res) => {
             images: [] // No images in this version
         }).save();
 
-        // Update product's average rating if needed
-        await updateProductRating(productId);
+        // Rest of your existing code for updating the product
         
         res.status(201).json({ message: 'Review added successfully!', review });
     } catch (error) {
@@ -60,25 +43,6 @@ exports.addReview = async (req, res) => {
         res.status(500).json({ message: 'Server error.' });
     }
 };
-
-// Helper function to update product rating
-async function updateProductRating(productId) {
-    try {
-        const reviews = await Review.find({ product: productId });
-        
-        if (reviews.length > 0) {
-            const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
-            const averageRating = totalRating / reviews.length;
-            
-            await Product.findByIdAndUpdate(productId, {
-                rating: averageRating,
-                numReviews: reviews.length
-            });
-        }
-    } catch (error) {
-        console.error('Error updating product rating:', error);
-    }
-}
 exports.getUserReviews = async (req, res) => {
     try {
         const user = req.user._id; 
